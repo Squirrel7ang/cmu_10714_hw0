@@ -20,7 +20,7 @@ def add(x, y):
         Sum of x + y
     """
     ### BEGIN YOUR CODE
-    pass
+    return x + y
     ### END YOUR CODE
 
 
@@ -48,7 +48,17 @@ def parse_mnist(image_filename, label_filename):
                 for MNIST will contain the values 0-9.
     """
     ### BEGIN YOUR CODE
-    pass
+    with gzip.open(image_filename, 'rb') as f:
+        magic, images_num, rows, cols = struct.unpack('>IIII', f.read(16))
+        X = np.frombuffer(f.read(), dtype=np.uint8)
+        X = X.reshape(images_num, rows * cols)
+        X = X.astype(np.float32) / 255.0
+
+    with gzip.open(label_filename, 'rb') as f:
+        magic, labels_num = struct.unpack('>II', f.read(8))
+        y = np.frombuffer(f.read(), dtype=np.uint8)
+
+    return (X, y)
     ### END YOUR CODE
 
 
@@ -68,7 +78,12 @@ def softmax_loss(Z, y):
         Average softmax loss over the sample.
     """
     ### BEGIN YOUR CODE
-    pass
+    batch_size = Z.shape[0]
+    exp = np.exp(Z)
+    sum_exp = np.sum(exp, axis=1)
+    log_sum_exp = np.log(sum_exp)
+    z_y = Z[np.arange(batch_size), y]
+    return np.mean(log_sum_exp - z_y)
     ### END YOUR CODE
 
 
@@ -91,7 +106,21 @@ def softmax_regression_epoch(X, y, theta, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass
+    num_examples = X.shape[0]
+    for i in range(0, num_examples, batch):
+        batch_size = num_examples - i if (i + batch > num_examples) else batch
+        X_batch = X[i : i+batch_size]
+        y_batch = y[i : i+batch_size]
+        
+        exp_X_theta = np.exp(np.dot(X_batch, theta))
+        Z_batch = exp_X_theta / np.sum(exp_X_theta, axis=1, keepdims=True)
+
+        Iy_batch = np.zeros_like(Z_batch)
+        Iy_batch[np.arange(batch_size), y_batch] = 1.0
+
+        grad = X_batch.T.dot(Z_batch - Iy_batch) / batch_size
+
+        theta -= lr * grad
     ### END YOUR CODE
 
 
@@ -118,6 +147,35 @@ def nn_epoch(X, y, W1, W2, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
+    def ReLU(X):
+        return np.maximum(X, 0)
+
+    def normalize(X):
+        return X / np.sum(X, axis=1, keepdims=True)
+
+    num_examples =  X.shape[0]
+    input_dim    =  X.shape[1]
+    num_classes  = W2.shape[1]
+
+    for i in range(0, num_examples, batch):
+        batch_size = num_examples - i if (i + batch > num_examples) else batch
+        X_batch = X[i : i+batch_size]
+        y_batch = y[i : i+batch_size]
+
+        Z1_batch = ReLU(np.dot(X_batch, W1))
+
+        # for computing G2
+        norm_exp = normalize(np.exp(np.dot(Z1_batch, W2)))
+        Iy_batch = np.zeros_like(norm_exp)
+        Iy_batch[np.arange(batch_size), y_batch] = 1.0
+
+        G2_batch = norm_exp - Iy_batch
+        G1_batch = np.where(Z1_batch > 0, 1.0, 0.0) * np.dot(G2_batch, W2.T)
+
+        grad_W1 = 1/batch_size * np.dot(X_batch.T, G1_batch)
+        grad_W2 = 1/batch_size * np.dot(Z1_batch.T, G2_batch)
+        W1 -= lr * grad_W1
+        W2 -= lr * grad_W2
     pass
     ### END YOUR CODE
 
