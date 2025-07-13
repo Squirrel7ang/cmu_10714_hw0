@@ -2,8 +2,44 @@
 #include <pybind11/numpy.h>
 #include <cmath>
 #include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <string>
 
 namespace py = pybind11;
+
+template <typename T>
+void print_matrix(T* X, int m, int n, std::string name="matrix") {
+    std::stringstream ss;
+
+    auto now = std::chrono::system_clock::now();
+    auto now_time = std::chrono::system_clock::to_time_t(now);
+    ss << std::put_time(std::localtime(&now_time), "%Y-%m-%d %H:%M:%S") << std::endl;
+    ss << "name is " << name << std::endl;
+
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            ss << (double) X[i*n+j] << ' ';
+        }
+        ss << std::endl;
+    }
+    ss << std::endl;
+
+    std::ofstream file("/home/tang/cs/10714/hw0/src/cpp.log", std::ios::app);  // 追加模式
+    if (file) {
+        file << ss.str();
+        file.close();
+    }
+}
+
+template <typename T>
+void print_info(T msg) {
+    std::ofstream file("/home/tang/cs/10714/hw0/src/cpp.log", std::ios::app);  // 追加模式
+    if (file) {
+        file << msg;
+        file.close();
+    }
+}
 
 template <typename T>
 void dot(T* X, T* Y, T* result, int m, int n, int p) {
@@ -40,7 +76,7 @@ void normalize_by_row(T* X, T* result, int m, int n) {
             sum = sum + X[i*n+j];
         }
         for (int j = 0; j < n; j++) {
-            result[i*n+j] = X[i] / sum;
+            result[i*n+j] = X[i*n+j] / sum;
         }
     }
 }
@@ -95,23 +131,36 @@ void softmax_regression_epoch_cpp(const float *X, const unsigned char *y,
      */
 
     /// BEGIN YOUR CODE
-    float* Z_batch  = new float[m * k];
-    float* Iy_batch = new float[m * k];
-    float* grad     = new float[m * k];
+    float* Z_batch  = new float[batch * k];
+    float* Iy_batch = new float[batch * k];
+    float* grad     = new float[n     * k];
+    float* tmp      = new float[batch * k];
+    float* X_batch_T= new float[batch * n];
+
     for (int i = 0; i < (int)m; i += batch) {
         int batch_size = (i + batch > m) ? (m - i) : batch; 
 
-        const float* X_batch = X + batch_size * n;
-        const unsigned char* y_batch = y + batch_size;
+        const float* X_batch = X + i * n;
+        const unsigned char* y_batch = y + i;
 
-        dot<float>((float*)X_batch, theta, Z_batch, m, n, k);
-        exp(Z_batch, Z_batch, m, k);
-        normalize_by_row<float>(Z_batch, Z_batch, m, k);
-        gen_one_hot(Iy_batch, y_batch, m, k);
-        sub(Z_batch, Iy_batch, grad, m, k);
-        mul(lr / batch_size, grad, grad, m, k);
-        sub(theta, grad, theta, m, k);
+        dot<float>((float*)X_batch, theta, Z_batch, batch_size, n, k);
+        exp(Z_batch, Z_batch, batch_size, k);
+        normalize_by_row<float>(Z_batch, Z_batch, batch_size, k);
+        gen_one_hot(Iy_batch, y_batch, batch_size, k);
+
+        // compute grad
+        transpose((float*)X_batch, X_batch_T, batch_size, n);
+        sub(Z_batch, Iy_batch, tmp, batch_size, k);
+        dot(X_batch_T, tmp, grad, n, batch_size, k);
+        mul((float)(lr / (float)batch_size), grad, grad, n, k);
+
+        sub(theta, grad, theta, n, k);
     }
+    delete[] Z_batch;
+    delete[] Iy_batch;
+    delete[] grad;
+    delete[] tmp;
+    delete[] X_batch_T;
     /// END YOUR CODE
 }
 

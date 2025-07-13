@@ -4,4 +4,4 @@ default:
 
 .PHONY: clean
 clean:
-	rm src/simple_ml_ext.so
+	rm src/simple_ml_ext.so src/*.log

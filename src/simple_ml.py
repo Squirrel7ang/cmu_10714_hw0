@@ -3,6 +3,7 @@ import numpy as np
 import gzip
 try:
     from simple_ml_ext import *
+    from simple_ml_ext import softmax_regression_epoch_cpp
 except:
     pass
 
